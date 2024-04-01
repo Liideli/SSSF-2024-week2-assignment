@@ -11,6 +11,7 @@ import {User} from '../../types/DBTypes';
 import {MessageResponse} from '../../types/MessageTypes';
 import userModel from '../models/userModel';
 import CustomError from '../../classes/CustomError';
+import bcrypt from 'bcrypt';
 
 const userGet = async (
   req: Request<{id: string}, {}, {}>,
@@ -104,4 +105,23 @@ const userDeleteCurrent = async (
   }
 };
 
-export {userListGet, userGet, userPost, userPutCurrent, userDeleteCurrent};
+const checkToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = res.locals.user;
+    if (!user) {
+      throw new CustomError('User not found', 404);
+    }
+    return user;
+  } catch (error) {
+    next(error);
+  }
+};
+
+export {
+  userListGet,
+  userGet,
+  userPost,
+  userPutCurrent,
+  userDeleteCurrent,
+  checkToken,
+};
