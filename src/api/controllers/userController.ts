@@ -7,7 +7,7 @@
 // - checkToken - check if current user token is valid: return data from res.locals.user as UserOutput. No need for database query
 
 import {Request, Response, NextFunction} from 'express';
-import {User, UserOutput} from '../../types/DBTypes';
+import {LoginUser, User, UserOutput} from '../../types/DBTypes';
 import {MessageResponse} from '../../types/MessageTypes';
 import userModel from '../models/userModel';
 import CustomError from '../../classes/CustomError';
@@ -69,13 +69,19 @@ const userPost = async (
 };
 
 const userPutCurrent = async (
-  req: Request<{id: string}, {}, Omit<User, 'user_id'>>,
-  res: Response<MessageResponse & {data: User}>,
+  req: Request<{}, {}, Omit<User, 'user_id'>>,
+  res: Response<MessageResponse & {data: User}, {user: LoginUser}>,
   next: NextFunction
 ) => {
   try {
+    if (!res.locals.user) {
+      throw new CustomError('Not authorized', 401);
+    }
+    if (req.body.password) {
+      req.body.password = bcrypt.hashSync(req.body.password, 10);
+    }
     const user = await userModel
-      .findByIdAndUpdate(req.params.id, req.body, {
+      .findByIdAndUpdate(res.locals.user._id, req.body, {
         new: true,
       })
       .select('-password -__v -role');
@@ -93,30 +99,39 @@ const userPutCurrent = async (
 };
 
 const userDeleteCurrent = async (
-  req: Request<{id: string}, {}, {}>,
-  res: Response<MessageResponse>,
+  req: Request<{}, {}, {}>,
+  res: Response<MessageResponse & {data: UserOutput}, {user: UserOutput}>,
   next: NextFunction
 ) => {
   try {
+    if (!res.locals.user) {
+      throw new CustomError('Not authorized', 401);
+    }
     const user = await userModel
-      .findByIdAndDelete(req.params.id)
+      .findByIdAndDelete(res.locals.user._id)
       .select('-password -__v -role');
     if (!user) {
       throw new CustomError('No user found', 404);
     }
-    res.json({message: 'User deleted'});
+    res.json({message: 'User deleted', data: user});
   } catch (error) {
     next(error);
   }
 };
 
-const checkToken = async (req: Request, res: Response, next: NextFunction) => {
+const checkToken = async (
+  req: Request,
+  res: Response<Partial<User>, {user: LoginUser}>,
+  next: NextFunction
+) => {
   try {
-    const user = res.locals.user;
-    if (!user) {
-      throw new CustomError('User not found', 404);
+    if (!res.locals.user) {
+      throw new CustomError('Not authorized', 401);
     }
-    return user;
+    const user: Partial<User> = {...res.locals.user};
+    delete user.role;
+
+    res.json(user);
   } catch (error) {
     next(error);
   }

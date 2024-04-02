@@ -10,23 +10,24 @@
 // - catPost - create new cat
 
 import {Request, Response, NextFunction} from 'express';
-import {Cat} from '../../types/DBTypes';
+import {Cat, CatTest, LoginUser, UserOutput} from '../../types/DBTypes';
 import catModel from '../models/catModel';
 import {MessageResponse} from '../../types/MessageTypes';
 import CustomError from '../../classes/CustomError';
 
 const catGetByUser = async (
   req: Request,
-  res: Response<Cat[]>,
+  res: Response<Cat[], {user: UserOutput}>,
   next: NextFunction
 ) => {
   try {
-    if (!req.user) {
-      throw new CustomError('User not found', 404);
+    if (!res.locals.user) {
+      throw new CustomError('Not authorized', 401);
     }
     const cats = await catModel
-      .find({user_id: res.locals.user._id})
-      .select('-__v');
+      .find({owner: res.locals.user._id})
+      .select('-__v')
+      .populate('owner', '-__v -password -role');
     res.json(cats);
   } catch (error) {
     next(error);
@@ -84,34 +85,50 @@ const catGetByBoundingBox = async (
 };
 
 const catPutAdmin = async (
-  req: Request<{id: string}, {}, Omit<Cat, 'cat_id'>>,
-  res: Response<MessageResponse & {data: Cat}>,
+  req: Request<{id: string}, {}, Partial<Cat>>,
+  res: Response<MessageResponse & {data: Cat}, {user: LoginUser}>,
   next: NextFunction
 ) => {
   try {
-    const cat = await catModel
-      .findByIdAndUpdate(req.params.id, req.body, {new: true})
-      .select('-__v');
-    if (!cat) {
-      throw new CustomError('No cat found', 404);
+    if (res.locals.user.role !== 'admin') {
+      throw new CustomError('Not authorized', 401);
     }
-    res.json({message: 'Cat updated', data: cat});
+    const cat = await catModel.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+
+    if (!cat) {
+      throw new CustomError('Cat not found', 404);
+    }
+    const response = {
+      message: 'Cat updated',
+      data: cat,
+    };
+    res.json(response);
   } catch (error) {
     next(error);
   }
 };
 
 const catDeleteAdmin = async (
-  req: Request<{id: string}>,
-  res: Response<MessageResponse>,
+  req: Request<{id: string}, {}, {}>,
+  res: Response<MessageResponse & {data: Cat}, {user: LoginUser}>,
   next: NextFunction
 ) => {
   try {
-    const cat = await catModel.findByIdAndDelete(req.params.id);
-    if (!cat) {
-      throw new CustomError('No cat found', 404);
+    if (res.locals.user.role !== 'admin') {
+      throw new CustomError('Not authorized', 401);
     }
-    res.json({message: 'Cat deleted'});
+    const cat = await catModel.findByIdAndDelete(req.params.id);
+
+    if (!cat) {
+      throw new CustomError('Cat not found', 404);
+    }
+    const response = {
+      message: 'Cat deleted',
+      data: cat,
+    };
+    res.json(response);
   } catch (error) {
     next(error);
   }
@@ -119,38 +136,57 @@ const catDeleteAdmin = async (
 
 const catDelete = async (
   req: Request<{id: string}, {}, {}>,
-  res: Response<MessageResponse & {data: Cat}>,
+  res: Response<MessageResponse & {data: CatTest}, {user: LoginUser}>,
   next: NextFunction
 ) => {
   try {
-    const species = await catModel.findByIdAndDelete(req.params.id);
-    if (!species) {
-      throw new CustomError('No species found', 404);
+    if (!res.locals.user) {
+      throw new CustomError('Not authorized', 401);
+    }
+    const params = {
+      _id: req.params.id,
+      owner: res.locals.user._id,
+    };
+    const cat = await catModel.findOneAndDelete(params);
+
+    if (!cat) {
+      throw new CustomError('Cat not found', 404);
     }
     const response = {
-      message: 'Species deleted',
-      data: species,
+      message: 'Cat deleted',
+      data: cat as CatTest,
     };
     res.json(response);
   } catch (error) {
     next(error);
   }
 };
+
 const catPut = async (
-  req: Request<{id: string}, {}, Omit<Cat, 'cat_id'>>,
-  res: Response<MessageResponse & {data: Cat}>,
+  req: Request<{id: string}, {}, Partial<Cat>>,
+  res: Response<MessageResponse & {data: Cat}, {user: LoginUser}>,
   next: NextFunction
 ) => {
   try {
-    const species = await catModel
-      .findByIdAndUpdate(req.params.id, req.body, {new: true})
-      .select('-__v');
-    if (!species) {
-      throw new CustomError('No species found', 404);
+    if (!res.locals.user) {
+      throw new CustomError('Not authorized', 401);
+    }
+
+    const params = {
+      _id: req.params.id,
+      owner: res.locals.user._id,
+    };
+
+    const cat = await catModel.findOneAndUpdate(params, req.body, {
+      new: true,
+    });
+
+    if (!cat) {
+      throw new CustomError('Cat not found', 404);
     }
     const response = {
-      message: 'Species updated',
-      data: species,
+      message: 'Cat updated',
+      data: cat,
     };
     res.json(response);
   } catch (error) {
@@ -160,15 +196,18 @@ const catPut = async (
 
 const catGet = async (
   req: Request<{id: string}, {}, {}>,
-  res: Response<Cat>,
+  res: Response<Cat, {user: UserOutput}>,
   next: NextFunction
 ) => {
   try {
-    const species = await catModel.findById(req.params.id);
-    if (!species) {
-      throw new CustomError('No species found', 404);
+    const cat = await catModel
+      .findById(req.params.id)
+      .select('-__v')
+      .populate('owner', '-__v -password -role');
+    if (!cat) {
+      throw new Error('No cats found');
     }
-    res.json(species);
+    res.json(cat);
   } catch (error) {
     next(error);
   }
@@ -180,24 +219,46 @@ const catListGet = async (
   next: NextFunction
 ) => {
   try {
-    const cats = await catModel.find();
+    const cats = await catModel
+      .find()
+      .select('-__v')
+      .populate('owner', '-__v -password -role');
     res.json(cats);
-    console.log(cats);
   } catch (error) {
     next(error);
   }
 };
 
 const catPost = async (
-  req: Request<{}, {}, Omit<Cat, 'species_id'>>,
-  res: Response<MessageResponse & {data: Cat}>,
+  req: Request<{}, {}, Partial<Cat>>,
+  res: Response<
+    MessageResponse & {data: Cat},
+    {user: LoginUser; coords: [number, number]}
+  >,
   next: NextFunction
 ) => {
   try {
-    const species = await catModel.create(req.body);
+    if (!res.locals.user) {
+      throw new CustomError('Not authorized', 401);
+    }
+    if (!res.locals.coords) {
+      throw new CustomError('No coordinates found', 404);
+    }
+    const filename = req.file?.filename;
+    req.body.filename = filename;
+    req.body.location = {
+      type: 'Point',
+      coordinates: [res.locals.coords[0], res.locals.coords[1]],
+    };
+    req.body.owner = res.locals.user._id;
+    const cat = await catModel.create(req.body);
+
+    if (!cat) {
+      throw new CustomError('Cat not found', 404);
+    }
     const response = {
-      message: 'Species added',
-      data: species,
+      message: 'Cat added',
+      data: cat,
     };
     res.json(response);
   } catch (error) {
