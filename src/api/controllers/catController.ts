@@ -14,6 +14,7 @@ import {Cat, CatTest, LoginUser, UserOutput} from '../../types/DBTypes';
 import catModel from '../models/catModel';
 import {MessageResponse} from '../../types/MessageTypes';
 import CustomError from '../../classes/CustomError';
+import {validationResult} from 'express-validator';
 
 const catGetByUser = async (
   req: Request,
@@ -171,16 +172,13 @@ const catPut = async (
     if (!res.locals.user) {
       throw new CustomError('Not authorized', 401);
     }
-
     const params = {
       _id: req.params.id,
       owner: res.locals.user._id,
     };
-
     const cat = await catModel.findOneAndUpdate(params, req.body, {
       new: true,
     });
-
     if (!cat) {
       throw new CustomError('Cat not found', 404);
     }
@@ -231,38 +229,46 @@ const catListGet = async (
 
 const catPost = async (
   req: Request<{}, {}, Partial<Cat>>,
-  res: Response<
-    MessageResponse & {data: Cat},
-    {user: LoginUser; coords: [number, number]}
-  >,
+  res: Response<MessageResponse & {data: Cat}>,
   next: NextFunction
 ) => {
-  try {
-    if (!res.locals.user) {
-      throw new CustomError('Not authorized', 401);
-    }
-    if (!res.locals.coords) {
-      throw new CustomError('No coordinates found', 404);
-    }
-    const filename = req.file?.filename;
-    req.body.filename = filename;
-    req.body.location = {
-      type: 'Point',
-      coordinates: [res.locals.coords[0], res.locals.coords[1]],
-    };
-    req.body.owner = res.locals.user._id;
-    const cat = await catModel.create(req.body);
+  const errors = validationResult(req.body);
+  if (!errors.isEmpty()) {
+    const messages: string = errors
+      .array()
+      .map((error) => `${error.msg}: ${error.param}`)
+      .join(', ');
+    next(new CustomError(messages, 400));
+    return;
+  }
 
-    if (!cat) {
-      throw new CustomError('Cat not found', 404);
-    }
-    const response = {
-      message: 'Cat added',
-      data: cat,
+  const filename = req.file?.filename;
+  const owner = res.locals.user._id;
+  const coords = res.locals.coords;
+
+  if (typeof filename === 'string') {
+    const newCat = {
+      cat_name: req.body.cat_name,
+      weight: Number(req.body.weight),
+      owner: owner,
+      filename,
+      birthdate: req.body.birthdate,
+      location: coords,
     };
-    res.json(response);
-  } catch (error) {
-    next(error);
+
+    try {
+      const result = await catModel.create(newCat);
+      if (!result) {
+        throw new CustomError('Error creating a cat', 500);
+      }
+      const response = {
+        message: 'Cat added',
+        data: result,
+      };
+      res.json(response);
+    } catch (error) {
+      next(error);
+    }
   }
 };
 

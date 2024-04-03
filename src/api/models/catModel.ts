@@ -4,10 +4,6 @@ import mongoose from 'mongoose';
 import {Cat} from '../../types/DBTypes';
 
 const catSchema = new mongoose.Schema<Cat>({
-  _id: {
-    type: mongoose.Schema.Types.ObjectId,
-    auto: true,
-  },
   cat_name: {
     type: String,
     minlength: [3, 'Cat name is required.'],

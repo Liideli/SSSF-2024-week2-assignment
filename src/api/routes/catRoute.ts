@@ -12,7 +12,12 @@ import {
 } from '../controllers/catController';
 import multer, {FileFilterCallback} from 'multer';
 import {body, param, query} from 'express-validator';
-import {authenticate, getCoordinates, makeThumbnail} from '../../middlewares';
+import {
+  authenticate,
+  getCoordinates,
+  makeThumbnail,
+  validationErrors,
+} from '../../middlewares';
 
 const fileFilter = (
   request: Request,
@@ -39,6 +44,7 @@ router
     body('cat_name').notEmpty().escape(),
     body('birthdate').isDate(),
     body('weight').isNumeric(),
+    validationErrors,
     catPost
   );
 
@@ -54,13 +60,38 @@ router.route('/user').get(authenticate, catGetByUser);
 
 router
   .route('/admin/:id')
-  .put(authenticate, catPutAdmin)
+  .put(
+    param('id').isMongoId().notEmpty(),
+    authenticate,
+    validationErrors,
+    catPutAdmin
+  )
   .delete(authenticate, catDeleteAdmin);
 
 router
   .route('/:id')
-  .get(param('id'), catGet)
-  .put(authenticate, param('id'), catPut)
-  .delete(authenticate, param('id'), catDelete);
+  .get(
+    param('id'),
+    param('id').isMongoId().notEmpty(),
+    validationErrors,
+    catGet
+  )
+  .put(
+    authenticate,
+    param('id'),
+    param('id').isMongoId().notEmpty(),
+    body('cat_name').notEmpty().escape().optional(),
+    body('birthdate').isDate().optional(),
+    body('weight').isNumeric().optional(),
+    validationErrors,
+    catPut
+  )
+  .delete(
+    authenticate,
+    param('id'),
+    param('id').isMongoId().notEmpty(),
+    validationErrors,
+    catDelete
+  );
 
 export default router;
