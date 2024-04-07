@@ -6,6 +6,7 @@
 // - userDeleteCurrent - delete current user
 // - checkToken - check if current user token is valid: return data from res.locals.user as UserOutput. No need for database query
 
+/*
 import {Request, Response, NextFunction} from 'express';
 import {LoginUser, User, UserOutput} from '../../types/DBTypes';
 import {MessageResponse} from '../../types/MessageTypes';
@@ -145,3 +146,4 @@ export {
   userDeleteCurrent,
   checkToken,
 };
+*/

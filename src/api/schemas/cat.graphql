@@ -1,0 +1,41 @@
+scalar DateTime
+type Cat {
+  id: ID
+  cat_name: String
+  weight: Int
+  birthdate: DateTime
+  location: String
+  owner: User
+}
+
+type Query {
+  cats: [Cat]
+  cat(id: ID!): Cat
+}
+
+input CatInput {
+  cat_name: String!
+  weight: Int!
+  birthdate: DateTime!
+  location: String!
+  owner: ID!
+}
+
+input CatModifyInput {
+  cat_name: String
+  weight: Int
+  birthdate: DateTime
+  location: String
+  owner: ID
+}
+
+type catMessage {
+  message: String!
+  cat: Cat
+}
+
+type Mutation {
+  addCat(cat: CatInput): catMessage
+  modifyCat(id: ID!, cat: CatModifyInput): catMessage
+  deleteCat(id: ID!): catMessage
+}

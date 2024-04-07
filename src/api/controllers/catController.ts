@@ -9,6 +9,7 @@
 // - catListGet - get all cats
 // - catPost - create new cat
 
+/*
 import {Request, Response, NextFunction} from 'express';
 import {Cat, CatTest, LoginUser, UserOutput} from '../../types/DBTypes';
 import catModel from '../models/catModel';
@@ -57,7 +58,7 @@ const catGetByUser = async (
     next(error);
   }
 };*/
-
+/*
 const catGetByBoundingBox = async (
   req: Request<{}, {}, {}, {topRight: string; bottomLeft: string}>,
   res: Response<Cat[]>,
@@ -283,3 +284,4 @@ export {
   catListGet,
   catPost,
 };
+*/
